@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from utils.helpers import export_to_excel
+from thesis_code.utils.helpers import export_to_excel
 
 ###############   Algorithm 1     ########################
 def generate_features(time_series, window_lengths=[6, 14]):
@@ -34,9 +34,3 @@ def generate_features(time_series, window_lengths=[6, 14]):
         features[f"Right Mean (w={w})"] = pd.Series(time_series).rolling(window=w).apply(lambda x: np.mean(x[w//2:]), raw=True)
         features[f"Right Std (w={w})"] =pd.Series(time_series).rolling(window=w).apply(lambda x: np.std(x[w//2:],ddof=1), raw=True)
     return pd.DataFrame(features)
-
-time_series = np.random.randn(100)  # Simulated time series data
-
-features_df = generate_features(time_series)
-
-export_to_excel(features_df, filename="my_data100.xlsx", sheet_name="Data", index=True)
