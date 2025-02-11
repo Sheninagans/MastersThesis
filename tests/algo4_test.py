@@ -18,10 +18,10 @@ Y=Y.iloc[13:]
 theta, S = fit(Y, num_states=2, lambda_penalty=1000)
 export_to_excel(S, filename="S.csv")
 export_to_excel(theta,filename="theta.csv")
-print(theta[:10])
-print(S[:10])
+ 
 
 """ # Debug prints
+
 print("Final theta (cluster means):\n", theta)
 print("Final state assignments:\n", S)
 
