@@ -33,7 +33,7 @@ def fit_state_sequence(Y, theta, C, lambda_penalty, num_states):
     #L = np.sum(L_raw[:, :, None] * C[:, None, :], axis=1)
     L = L_raw @ C  # Apply C transformation afterward
     #print("L", L)
-    export_to_excel(L,filename="L.csv")
+    #export_to_excel(L,filename="L.csv")
     
     #L = np.array([[np.linalg.norm(Y_array[t] - theta.T @ C[:, i])**2 for i in range(N)] for t in range(T)])
     
@@ -55,8 +55,8 @@ def fit_state_sequence(Y, theta, C, lambda_penalty, num_states):
             V[t, i] = L[t, i] + V[t-1, prev_state] + Lambda[prev_state, i]
             #print("V:", V)
 
-    print("✅ Debug: V shape:", V.shape)
-    export_to_excel(V,filename="V.csv")
+    #print("✅ Debug: V shape:", V.shape)
+    #export_to_excel(V,filename="V.csv")
 
         # Backtrack to retrieve optimal state sequence
     S_opt = np.zeros((T, num_states))
@@ -114,4 +114,7 @@ def fit(Y, num_states, lambda_penalty, grid_size):
        # S /= S.sum(axis=1, keepdims=True)  # Normalize each row to sum to 1
     
     #print("✅ Debug: S shape before returning:", S.shape)  # Fixed from S_opt.shape
+    export_to_excel(S,filename="S.csv")
+    export_to_excel(C,filename="C.csv")
+    export_to_excel(theta,filename="theta.csv")
     return theta, S

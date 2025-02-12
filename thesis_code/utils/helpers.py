@@ -50,7 +50,7 @@ def export_to_excel(data, filename="output.csv", index=False, sheet_name="Sheet1
         else:
             raise ValueError("Invalid file format. Choose 'csv' or 'excel'.")
         
-        print(f"✅ Data successfully exported to: {full_path}")
+        print(f"✅ Data successfully exported to: {full_path[60:]}")
         
         return full_path  # Return the file path for reference
     except Exception as e:

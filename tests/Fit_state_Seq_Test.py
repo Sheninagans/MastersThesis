@@ -59,7 +59,7 @@ def test_fit_state_sequence(debug_flags=None):
     for row in S_test:
         assert any(np.allclose(row, C[:, i]) for i in range(C.shape[1])), "❌ S contains invalid values!"
     
-    print("\n✅ **Test Passed: S contains only valid probability simplex vectors from C!**")
+    #print("\n✅ **Test Passed: S contains only valid probability simplex vectors from C!**")
 
 # Run the test with debugging options
 test_fit_state_sequence(debug_flags={
