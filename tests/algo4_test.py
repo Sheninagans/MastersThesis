@@ -5,7 +5,7 @@ from thesis_code.analysis.algo1 import generate_features
 from thesis_code.utils.helpers import export_to_excel
 
 
-nas = load_data("nasdaq_2013_2022.csv")
+nas = load_data("nasdaq_1996_2005.csv")
 # Create a simple dataset
 Y = generate_features(nas["Last Price"], window_lengths=[6, 14])
 
@@ -15,7 +15,9 @@ Y = generate_features(nas["Last Price"], window_lengths=[6, 14])
 Y=Y.iloc[13:]
 
 # Run the model
-theta, S = fit(Y, num_states=2, lambda_penalty=1000)
+theta, S = fit(Y, num_states=2, lambda_penalty=10)
+print("✅ Debug: S shape:", S.shape)
+print("✅ Debug: theta shape:", theta.shape)
 export_to_excel(S, filename="S.csv")
 export_to_excel(theta,filename="theta.csv")
  

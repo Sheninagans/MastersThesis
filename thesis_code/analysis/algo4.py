@@ -30,36 +30,46 @@ def fit_state_sequence(Y, theta, C, lambda_penalty, num_states):
     [0.5*np.sum((Y_array[t] - theta[k, :])**2)
     for k in range(theta.shape[0])]
     for t in range(Y_array.shape[0])])
+    #L = np.sum(L_raw[:, :, None] * C[:, None, :], axis=1)
     L = L_raw @ C  # Apply C transformation afterward
+    #print("L", L)
+    export_to_excel(L,filename="L.csv")
     
     #L = np.array([[np.linalg.norm(Y_array[t] - theta.T @ C[:, i])**2 for i in range(N)] for t in range(T)])
-    #export_to_excel(L,filename="L.csv")
+    
     
     
     # Compute jump penalty matrix
-    Lambda = lambda_penalty / 4 * np.sum(np.abs(C[:, :, None] - C[:, None, :]), axis=0)
-    
-    # Initialize DP table
+    Lambda = np.round(lambda_penalty / 4 * np.sum(np.abs(C[:, :, None] - C[:, None, :])**2, axis=0), decimals=10)
+        # Initialize DP table
     V = np.zeros((T, N))
     V[0, :] = L[0, :]
-    
+
+    backtrack = np.zeros((T, N), dtype=int)  # Store previous states for backtracking
     for t in range(1, T):
         for i in range(N):
-            V[t, i] = L[t, i] + np.min(V[t-1, :] + Lambda[:, i])
-    
-    
-    # Backtrack to retrieve optimal state sequence
-    S_opt = np.zeros((T, num_states))  # Ensure shape matches `S`
+            prev_state = np.argmin(V[t-1, :])
+            backtrack[t, i] = prev_state  # Store best previous state
+            #print("Prev state:", prev_state,"Lambda[prev_state]", Lambda[prev_state, i])
+            #print("V[t-1, prev_state]:", V[t-1, prev_state])
+            V[t, i] = L[t, i] + V[t-1, prev_state] + Lambda[prev_state, i]
+            #print("V:", V)
+
+    print("✅ Debug: V shape:", V.shape)
+    export_to_excel(V,filename="V.csv")
+
+        # Backtrack to retrieve optimal state sequence
+    S_opt = np.zeros((T, num_states))
     idx = np.argmin(V[-1, :])
     for t in range(T-1, -1, -1):
         S_opt[t] = C[:, idx]
-        idx = np.argmin(V[t-1, :] + Lambda[:, idx])
+        if t > 0:
+            idx = backtrack[t, idx]  # Use stored best previous state
         
         
         #print("Final V values used for backtracking:", np.argmin(V[t-1, :]+Lambda[:, idx]))
         #print("Penalty matrix V:", V[t-1, :]+Lambda[:, idx])
         #print("Penalty matrix C:", C[:, idx])
-        #print(V)
         #print(t)
     #print("Loss matrix L:")
     #print(L)
@@ -82,30 +92,26 @@ def fit(Y, num_states, lambda_penalty, grid_size=0.05):
     # Create a probability grid with `grid_size` resolution
     C_vals = np.arange(0, 1 + grid_size, grid_size)  # Discretized values from 0 to 1
     C = np.array(np.meshgrid(*([C_vals] * num_states))).T.reshape(-1, num_states).T
-
-    # Keep only valid probability vectors (those that sum to 1)
     C = C[:, np.isclose(C.sum(axis=0), 1)]
+     #print("✅ Debug: C shape:", C.shape)   
+    #print(C)
     export_to_excel(C,filename="C.csv")
     
     # Initialize S randomly
     S = np.random.dirichlet(np.ones(num_states), size=T)
-    
-    for _ in range(10):
+
         
-        
-        theta = fit_parameters(Y, S, num_states)  # Step (a): Update Theta
-        S_new = fit_state_sequence(Y, theta, C, lambda_penalty, num_states)  # Step (b): Call Algorithm 5
-        
-        #print("✅ Debug: S shape:", S.shape)
-        
-        if np.allclose(S, S_new):
+    for iter_counter in range(100):  # Larger iteration limit
+        theta = fit_parameters(Y, S, num_states)
+        S_new = fit_state_sequence(Y, theta, C, lambda_penalty, num_states)
+        #print(f"Iteration {iter_counter}: Change in S = {np.linalg.norm(S - S_new)}")
+        if iter_counter>5 and np.linalg.norm(S - S_new) < 1e-6:
             break
-        
-        S = S_new  # Update S after convergence check
+        S = S_new
         
         # Ensure no column in S is entirely zero
-        S += 1e-8  # Small constant to prevent zero values
-        S /= S.sum(axis=1, keepdims=True)  # Normalize each row to sum to 1
+       # S += 1e-8  # Small constant to prevent zero values
+       # S /= S.sum(axis=1, keepdims=True)  # Normalize each row to sum to 1
     
     #print("✅ Debug: S shape before returning:", S.shape)  # Fixed from S_opt.shape
     return theta, S
