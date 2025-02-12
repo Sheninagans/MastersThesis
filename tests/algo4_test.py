@@ -15,7 +15,7 @@ Y = generate_features(nas["Last Price"], window_lengths=[6, 14])
 Y=Y.iloc[13:]
 
 # Run the model
-theta, S = fit(Y, num_states=2, lambda_penalty=10)
+theta, S = fit(Y, num_states=2, lambda_penalty=10,grid_size=0.01)
 print("✅ Debug: S shape:", S.shape)
 print("✅ Debug: theta shape:", theta.shape)
 export_to_excel(S, filename="S.csv")

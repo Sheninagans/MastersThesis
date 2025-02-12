@@ -78,7 +78,7 @@ def fit_state_sequence(Y, theta, C, lambda_penalty, num_states):
     return S_opt
 
 
-def fit(Y, num_states, lambda_penalty, grid_size=0.05):
+def fit(Y, num_states, lambda_penalty, grid_size):
     """
     Algorithm 4: Coordinate descent algorithm to fit the continuous jump model.
     """
