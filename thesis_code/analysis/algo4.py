@@ -31,42 +31,50 @@ def fit_state_sequence(Y, theta, C, lambda_penalty, num_states):
     for k in range(theta.shape[0])]
     for t in range(Y_array.shape[0])])
     #L = np.sum(L_raw[:, :, None] * C[:, None, :], axis=1)
+    
     L = L_raw @ C  # Apply C transformation afterward
+    #export_to_excel(L_raw,filename="L_raw.csv")
     #print("L", L)
-    #export_to_excel(L,filename="L.csv")
+    # export_to_excel(L,filename="L.csv")
     
     #L = np.array([[np.linalg.norm(Y_array[t] - theta.T @ C[:, i])**2 for i in range(N)] for t in range(T)])
     
     
     
     # Compute jump penalty matrix
-    Lambda = np.round(lambda_penalty / 4 * np.sum(np.abs(C[:, :, None] - C[:, None, :])**2, axis=0), decimals=10)
-        # Initialize DP table
+    Lambda = np.round(lambda_penalty / 4 * np.sum(np.abs(C[:, :, None] - C[:, None, :]), axis=0)**2, decimals=10)
+    
+    # Initialize DP table
     V = np.zeros((T, N))
     V[0, :] = L[0, :]
 
     backtrack = np.zeros((T, N), dtype=int)  # Store previous states for backtracking
     for t in range(1, T):
         for i in range(N):
-            prev_state = np.argmin(V[t-1, :])
-            backtrack[t, i] = prev_state  # Store best previous state
-            #print("Prev state:", prev_state,"Lambda[prev_state]", Lambda[prev_state, i])
-            #print("V[t-1, prev_state]:", V[t-1, prev_state])
+            # Find the previous state that minimizes the cost considering both V and Lambda
+            prev_state = np.argmin(V[t-1, :] + Lambda[:, i])
+            #backtrack[t, i] = prev_state  # Store best previous state
+            # Update V with the correct transition cost
             V[t, i] = L[t, i] + V[t-1, prev_state] + Lambda[prev_state, i]
             #print("V:", V)
 
+    #export_to_excel(L,filename="L.csv")
+    #export_to_excel(Lambda,filename="Lambda.csv")
+    #export_to_excel(V,filename="V.csv")
+    #export_to_excel(backtrack,filename="Prev_state.csv")
     #print("✅ Debug: V shape:", V.shape)
     #export_to_excel(V,filename="V.csv")
 
-        # Backtrack to retrieve optimal state sequence
+    # Backtrack to retrieve optimal state sequence
     S_opt = np.zeros((T, num_states))
     idx = np.argmin(V[-1, :])
     for t in range(T-1, -1, -1):
         S_opt[t] = C[:, idx]
         if t > 0:
-            idx = backtrack[t, idx]  # Use stored best previous state
-        
-        
+            idx = np.argmin(V[t-1, :])  # Use stored best previous state
+            #print("idx:", idx)  
+    #export_to_excel(S_opt,filename="S_opt.csv")
+
         #print("Final V values used for backtracking:", np.argmin(V[t-1, :]+Lambda[:, idx]))
         #print("Penalty matrix V:", V[t-1, :]+Lambda[:, idx])
         #print("Penalty matrix C:", C[:, idx])
@@ -85,8 +93,8 @@ def fit(Y, num_states, lambda_penalty, grid_size):
     T, D = Y.shape
     
     # Initialize clusters with K-means++
-    kmeans = KMeans(n_clusters=num_states, init='k-means++', n_init=10).fit(Y)
-    theta = kmeans.cluster_centers_
+    #kmeans = KMeans(n_clusters=num_states, init='k-means++', n_init=10).fit(Y)
+    #theta = kmeans.cluster_centers_
     
     # Discretize probability simplex
     # Create a probability grid with `grid_size` resolution

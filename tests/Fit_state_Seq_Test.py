@@ -1,5 +1,12 @@
+import sys
+import os
 import numpy as np
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, PROJECT_ROOT)
+from thesis_code.analysis.algo4 import fit_parameters
 from thesis_code.analysis.algo4 import fit_state_sequence  # Import function
+
+
 
 def test_fit_state_sequence(debug_flags=None):
     """

@@ -26,10 +26,11 @@ nas = nas.sort_index()  # Ensure chronological order
 
 # Scale data to start at index 100
 nas["Scaled Price"] = (nas["Last Price"] / nas["Last Price"].iloc[-1]) * 100
-nas = nas.dropna(subset=["Scaled Price"])  # Remove rows with missing prices
-export_to_excel(nas,filename="Nas1.csv")
+#nas["Scaled Price"] = (np.log(nas["Last Price"]))
+nas = nas.dropna(subset=["Scaled Price"])  # Remove rows wit        h missing prices
 # Generate features
 Y = generate_features(nas["Scaled Price"], window_lengths=[6, 14])
+export_to_excel(Y,filename="Features_Stand.csv")
 Y = Y.iloc[13:]
 
 # Ensure 'Date' column exists and convert it to datetime
@@ -40,13 +41,13 @@ if 'Date' in nas.columns:
 # Run the model
 theta, S = fit(Y, num_states=2, lambda_penalty=100, grid_size=0.05)
 export_to_excel(theta, filename="theta.csv")
-
+# 
 # Extract time index and prices
 time_index = nas.index[-len(Y):]  # Align time index with Y
 scaled_prices = nas["Scaled Price"].iloc[-len(Y):]  # Scaled index price
 state_1_prob = S[:, 0]  # Probability of being in state 1
 
-print("NaN check - Time Index:", nas.index.isna().sum())
+#print("NaN check - Time Index:", nas.index.isna().sum())
 
 # Ensure no NaN values before plotting
 if time_index.isna().any() or np.isnan(scaled_prices).any():

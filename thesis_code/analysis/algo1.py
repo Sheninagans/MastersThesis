@@ -1,5 +1,10 @@
 import numpy as np
 import pandas as pd
+import sys
+import os
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, PROJECT_ROOT)
 
 from thesis_code.utils.helpers import export_to_excel
 
@@ -33,4 +38,10 @@ def generate_features(time_series, window_lengths=[6, 14]):
         features[f"Left Std (w={w})"] = pd.Series(time_series).rolling(window=w).apply(lambda x: np.std(x[:w//2],ddof=1), raw=True)
         features[f"Right Mean (w={w})"] = pd.Series(time_series).rolling(window=w).apply(lambda x: np.mean(x[w//2:]), raw=True)
         features[f"Right Std (w={w})"] =pd.Series(time_series).rolling(window=w).apply(lambda x: np.std(x[w//2:],ddof=1), raw=True)
-    return pd.DataFrame(features)
+
+    features_df = pd.DataFrame(features)
+    
+    #Standardize all features (except for NaN values)
+    standardized_features = (features_df - features_df.mean()) / features_df.std()
+
+    return pd.DataFrame(standardized_features)
