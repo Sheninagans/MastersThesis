@@ -40,8 +40,9 @@ def generate_features(time_series, window_lengths=[6, 14]):
         features[f"Right Std (w={w})"] =pd.Series(time_series).rolling(window=w).apply(lambda x: np.std(x[w//2:],ddof=1), raw=True)
 
     features_df = pd.DataFrame(features)
+    features_df = features_df.iloc[13:]
+    
     
     #Standardize all features (except for NaN values)
     standardized_features = (features_df - features_df.mean()) / features_df.std()
-
     return pd.DataFrame(standardized_features)
