@@ -5,7 +5,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, PROJECT_ROOT)
 from thesis_code.analysis.algo4 import fit_parameters
 from thesis_code.analysis.algo4 import fit_state_sequence  # Import function
-
+from thesis_code.utils.helpers import export_to_excel
 
 
 def test_fit_state_sequence(debug_flags=None):
@@ -48,13 +48,20 @@ def test_fit_state_sequence(debug_flags=None):
 
     # Step 5: Compute Lambda matrix
     Lambda = (lambda_penalty / 4) * np.sum(np.abs(C[:, :, None] - C[:, None, :]), axis=0)
+    
+    export_to_excel(Y, filename="Y.csv")
+    export_to_excel(Lambda, filename="Lambda.csv")
+    export_to_excel(C, filename="C.csv")
+
+
+
 
     if debug_flags.get("print_Lambda", False):
         print("\n📌 **Lambda (Jump Penalty Matrix)**:\n", Lambda)
 
     # Step 6: Run fit_state_sequence
     S_test = fit_state_sequence(Y, theta, C, lambda_penalty, num_states=2)
-
+    export_to_excel(S_test, filename="S_Test.csv")
     if debug_flags.get("print_V", False):
         print("\n📌 **V (Dynamic Programming Table) - Needs to be printed inside fit_state_sequence**")
 

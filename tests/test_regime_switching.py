@@ -85,3 +85,9 @@ Initial_centroids_df = pd.DataFrame(Initial_centroids)
 export_to_excel(Initial_centroids_df, filename="Initial_centroids.csv")
 
 print("✅ Initial centroids successfully exported!")
+
+
+T=10
+for t in range(T-1, -1, -1):
+    print(t)
+    

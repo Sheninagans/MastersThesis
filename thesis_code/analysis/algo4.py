@@ -5,6 +5,7 @@ from sklearn.cluster import KMeans
 import cvxpy as cp
 import random
 
+
 def fit_parameters(Y, S, K):
     theta = []
     for k in range(K):
@@ -25,22 +26,55 @@ def fit_state_sequence(Y, theta, C, lambda_penalty, num_states):
     
     V = np.zeros((T, N))
     V[0, :] = L[0, :]
-    
+        
     backtrack = np.zeros((T, N), dtype=int)
     for t in range(1, T):
         for i in range(N):
             prev_state = np.argmin(V[t-1, :] + Lambda[:, i])
             V[t, i] = L[t, i] + V[t-1, prev_state] + Lambda[prev_state, i]
     
-    S_opt = np.zeros((T, num_states))
+        S_opt = np.zeros((T, num_states))
     idx = np.argmin(V[-1, :])
     for t in range(T-1, -1, -1):
         S_opt[t] = C[:, idx]
         if t > 0:
-            idx = np.argmin(V[t-1, :])
-
+            idx = np.argmin(V[t-1, :]+Lambda[:,idx])
         
     return S_opt
+
+
+def initialize_S_kmeans(Y, num_states):
+    """
+    Initializes the state matrix S using K-means++ clustering with soft assignments.
+
+    Parameters:
+    Y (numpy.ndarray or pd.DataFrame): The feature matrix (T x D).
+    num_states (int): The number of states/clusters.
+
+    Returns:
+    S (numpy.ndarray): The initialized state matrix (T x num_states) with soft assignments.
+    """
+
+    # Ensure Y is a NumPy array
+    Y_array = Y if isinstance(Y, np.ndarray) else Y.to_numpy()
+
+    # Apply K-means++ clustering
+    kmeans = KMeans(n_clusters=num_states, init='k-means++', n_init=10, random_state=42)
+    kmeans.fit(Y_array)
+
+    # Compute squared Euclidean distances from each point to each cluster center
+    distances = np.linalg.norm(Y_array[:, None, :] - kmeans.cluster_centers_, axis=2)  # Shape: (T, num_states)
+
+    # Convert distances to similarity scores (higher similarity = closer to cluster center)
+    similarity_scores = np.exp(-distances)  # Inverse distance weighting
+
+    # Normalize to ensure each row sums to 1 (soft clustering)
+    S = similarity_scores / similarity_scores.sum(axis=1, keepdims=True)
+
+    return S
+
+
+
 
 def fit(Y, num_states, lambda_penalty, grid_size,tolerance):
     T, D = Y.shape
@@ -56,42 +90,21 @@ def fit(Y, num_states, lambda_penalty, grid_size,tolerance):
     best_obj_value = float('inf')
     
     obj_values = []
-    kmeans_results = []
     S_initializations = []  # Store all initial S matrices
+
+    
     
     for i in range(10):  # Run 10 times with different K-means++ initializations
         #sample_indices = np.random.choice(Y.shape[0], size=int(0.8 * Y.shape[0]), replace=False)  
         #Y_sample = Y.iloc[sample_indices]  # Subsample for centroid initialization  
-        # Fit K-means on the full dataset but use initial centroids from Y_sample
+        #Fit K-means on the full dataset but use initial centroids from Y_sample
         #kmeans = KMeans(n_clusters=num_states, init='k-means++', n_init=1, random_state=None).fit(Y)
-        
+        S=initialize_S_kmeans(Y, num_states)
+        #S_initializations.append(S.copy())  # Save initial S for later analysis
+
         #S = np.zeros((T, num_states))
         #S[np.arange(T), kmeans.labels_] = 1  # One-hot encode initial states
-        
-        # Store the initial S matrix as a flattened row
-        
-        sample_indices = np.random.choice(Y.shape[0], size=int(0.6 * Y.shape[0]), replace=False)  
-        Y_sample = Y.iloc[sample_indices]  # Subsample for centroid initialization  
-        
-        # Fit K-means on the full dataset but use initial centroids from Y_sample
-        kmeans = KMeans(n_clusters=num_states, init='k-means++', n_init=10, random_state=i*5).fit(Y)
-        
-        # Compute distances from each observation to each cluster center
-        distances = np.array([np.sum((Y - center)**2, axis=1) for center in kmeans.cluster_centers_])
-        
-        # Convert distances to 'probabilities' (inverse of distance)
-        probabilities = np.exp(-distances / (np.max(distances) + np.random.uniform(0.1, 0.5)))
-        probabilities = probabilities + np.random.normal(0, 0.01, probabilities.shape)  # Small noise
-        probabilities_normalized = probabilities / np.sum(probabilities, axis=0)
-        
-        # Now, map these probabilities to the nearest point in your discretized simplex (C)
-        S = np.zeros((T, num_states))
-        for t in range(T):
-            # Find the closest point in C for each observation
-            closest_point = np.argmin(np.sum((C.T - probabilities_normalized[:, t])**2, axis=1))
-            S[t] = C[:, closest_point]
-        S_initializations.append(S.flatten())
-        
+  
         for iter_counter in range(100):
             theta = fit_parameters(Y, S, num_states)
             S_new = fit_state_sequence(Y, theta, C, lambda_penalty, num_states)
@@ -113,8 +126,8 @@ def fit(Y, num_states, lambda_penalty, grid_size,tolerance):
 
     export_to_excel(best_S, filename="S_Opt.csv")
     export_to_excel(best_theta, filename="theta_opt.csv")
-    export_to_excel(np.array(obj_values), filename="obj_values.csv")
-    export_to_excel(np.array(kmeans_results), filename="kmeans_results.csv")
+    #export_to_excel(np.array(obj_values), filename="obj_values.csv")
+    #export_to_excel(np.array(kmeans_results), filename="kmeans_results.csv")
     
     return best_theta, best_S
 
