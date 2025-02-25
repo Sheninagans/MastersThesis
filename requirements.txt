@@ -9,3 +9,4 @@ pytest
 jupyter 
 cvxpy
 openpyxl
+joblib

@@ -41,7 +41,7 @@ if 'Date' in nas.columns:
     nas.set_index('Date', inplace=True)  # Set 'Date' as index
 
 # Run the model
-theta, S = fit(Y, num_states=2, lambda_penalty=800, grid_size=0.05, tolerance=1e-7)
+theta, S = fit(Y, num_states=2, lambda_penalty=800, grid_size=0.02, tolerance=1e-7)
 export_to_excel(theta, filename="theta.csv")
 
 # Extract time index and prices

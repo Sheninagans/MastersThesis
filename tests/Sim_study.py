@@ -1,93 +1,114 @@
 import sys
 import os
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.insert(0, PROJECT_ROOT)
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import balanced_accuracy_score
+from joblib import Parallel, delayed
+from scipy.linalg import expm  # Needed for continuous-time Markov chain scaling
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, PROJECT_ROOT)
+
 from thesis_code.analysis.algo4 import fit
+from thesis_code.analysis.algo1 import generate_features
 
-def simulate_state_sequence(T, P):
-    """Simulates a state sequence using the given transition probability matrix."""
-    num_states = P.shape[0]
+def simulate_continuous_markov_returns(T, Q, mu, sigma, dt=1/252):
+    """Simulates a GBM-compatible return process with a continuous-time Markov chain."""
+    P_scaled = expm(Q * dt)  # Convert generator matrix Q to transition matrix P
+
+    # Convert annual to daily values
+    mu_daily = mu / 252
+    sigma_daily = sigma / np.sqrt(252)
+
+    num_states = Q.shape[0]
     states = np.zeros(T, dtype=int)
-    states[0] = np.random.choice(num_states)  # Start from a random state
+    states[0] = np.random.choice(num_states)
+    returns = np.zeros(T)
+
     for t in range(1, T):
-        states[t] = np.random.choice(num_states, p=P[states[t-1]])
-    return states
-
-def generate_observations(states, mu, sigma):
-    """Generates observations based on the state sequence."""
-    T = len(states)
-    Y = np.array([np.random.normal(mu[s], sigma[s]) for s in states])
-    return Y.reshape(-1, 1)  # Ensure Y is a column vector
-
-def apply_time_scaling(mu, sigma, P, scale):
-    """Scales parameters based on time frame (daily, weekly, monthly)."""
-    P_scaled = np.linalg.matrix_power(P, scale)
-    P_scaled /= P_scaled.sum(axis=1, keepdims=True)  # Ensure transition probabilities sum to 1
-    mu_scaled = mu * scale
-    sigma_scaled = sigma * np.sqrt(scale)
-    return mu_scaled, sigma_scaled, P_scaled
-
-# Simulation parameters
-T = 1000  # Number of time steps
-num_states = 2
-mu = np.array([0.0123, -0.0157])  # Mean returns per state
-sigma = np.array([0.0347, 0.0778])  # Volatility per state
-P = np.array([[0.9629, 0.0371], [0.2102, 0.7898]])  # Transition matrix
+        states[t] = np.random.choice(num_states, p=P_scaled[states[t-1]])
+        dW = np.random.normal(0, np.sqrt(dt))
+        returns[t] = mu[states[t]]*dt + sigma_daily[states[t]] * dW   
 
 
+    return states, returns
 
-
-# Run simulation for different time scales
-time_scales = {"Daily": 1}
-penalties = {"Daily": 0.01}
-#time_scales = {"Daily": 1, "Weekly": 5, "Monthly": 20}
-#penalties = {"Daily": 100, "Weekly": 50, "Monthly": 1}
-
-results = {}
-for scale_name, scale_value in time_scales.items():
-    print(f"Running simulation for {scale_name} data...")
-    mu_scaled, sigma_scaled, P_scaled = apply_time_scaling(mu, sigma, P, scale_value)
-    states = simulate_state_sequence(T, P_scaled)
-    Y = generate_observations(states, mu_scaled, sigma_scaled)
-    lambda_penalty = penalties[scale_name]
-    theta_est, S_est = fit(Y, num_states=num_states, lambda_penalty=lambda_penalty, grid_size=0.05)
+def compute_regime_statistics(Y, S):
+    """Computes mean returns, volatilities, and sample jump probability (gamma)."""
+    num_states = S.shape[1]
+    min_length = min(len(Y), len(S))
+    Y, S = Y[:min_length], S[:min_length]
+    state_assignments = np.argmax(S, axis=1)
     
-    results[scale_name] = (states, np.argmax(S_est, axis=1))
+    mu_est = np.array([np.mean(Y[state_assignments == k]) if np.any(state_assignments == k) else np.nan for k in range(num_states)])
+    sigma_est = np.array([np.std(Y[state_assignments == k], ddof=1) if np.any(state_assignments == k) else np.nan for k in range(num_states)])
+    num_transitions = np.sum(state_assignments[1:] != state_assignments[:-1])
+    gamma = num_transitions / (len(state_assignments) - 1)
+    for k in range(num_states):
+        regime_returns = Y[state_assignments == k]
+        print(f"Regime {k}: {len(regime_returns)} observations")
+    return mu_est, sigma_est, gamma, state_assignments
 
-    # Compute estimated means and volatilities
-    mu_est = np.mean(theta_est, axis=1)
-    sigma_est = np.array([
-        np.std(Y[np.argmax(S_est, axis=1) == k]) if np.sum(np.argmax(S_est, axis=1) == k) > 1 else np.nan
-        for k in range(num_states)
-    ])
+def estimate_transition_matrix(states, num_states=2):
+    """Estimate empirical transition matrix from simulated states."""
+    counts = np.zeros((num_states, num_states))
+    for t in range(1, len(states)):
+        counts[states[t - 1], states[t]] += 1
+    return counts / counts.sum(axis=1, keepdims=True)
 
-    # Compute standard error of mu
-    state_counts = np.array([np.sum(np.argmax(S_est, axis=1) == k) for k in range(num_states)])
-    mu_se = sigma_est / np.sqrt(state_counts)  # Standard error of the mean
+def run_simulation(T, Q, mu, sigma, num_states=2, dt=1/252, lambda_penalty=100):
+    """Runs a single simulation with properly aligned returns and feature set."""
+    states, returns = simulate_continuous_markov_returns(T, Q, mu, sigma, dt=dt)
+    X = generate_features(returns, window_lengths=[6, 14])
+    returns = returns[13:]
+    theta_est, S_est = fit(X, num_states=num_states, lambda_penalty=lambda_penalty, grid_size=0.05, tolerance=1e-7)
+    return compute_regime_statistics(returns, S_est), states
 
-    # Compute Balanced Accuracy
-    true_states = states  # Ground truth states from simulation
-    predicted_states = np.argmax(S_est, axis=1)  # Estimated states from the model
-    BAC = balanced_accuracy_score(true_states, predicted_states)
-    
-    # Print results
-    print(f"{scale_name} - State Classification Accuracy (BAC): {BAC:.2%}")
-    print(f"True means: {mu_scaled}")
-    print(f"Estimated means: {mu_est}")
-    print(f"Estimated standard errors (mu): {mu_se}")  # Print standard errors
-    print(f"True volatilities: {sigma_scaled}")
-    print(f"Estimated volatilities: {sigma_est}")
+def parallel_simulation(num_simulations, T, Q, mu, sigma, num_states=2, dt=1/252, lambda_penalty=100, n_jobs=5):
+    """Runs multiple simulations in parallel while preventing joblib deadlocks."""
+    results = Parallel(n_jobs=n_jobs, backend="loky", verbose=10)(
+        delayed(run_simulation)(T, Q, mu, sigma, num_states, dt, lambda_penalty) for _ in range(num_simulations)
+    )
+    stats, state_sequences = zip(*results)
+    mu_vals, sigma_vals, gamma_vals, _ = zip(*stats)
+    return {
+        "mu_mean": np.nanmean(mu_vals, axis=0), "mu_std": np.nanstd(mu_vals, axis=0),
+        "sigma_mean": np.nanmean(sigma_vals, axis=0), "sigma_std": np.nanstd(sigma_vals, axis=0),
+        "gamma_mean": np.nanmean(gamma_vals), "gamma_std": np.nanstd(gamma_vals),
+        "state_sequences": state_sequences
+    }
 
-    # Plot results
-    plt.figure(figsize=(12, 4))
-    plt.plot(states, label="True States", linestyle='dashed')
-    plt.plot(np.argmax(S_est, axis=1), label="Estimated States", alpha=0.7)
-    plt.xlabel("Time")
-    plt.ylabel("State")
-    plt.title(f"True vs. Estimated States ({scale_name})")
-    plt.legend()
-    plt.show()
+# Example Usage
+T = 1000
+#Q = np.array([[-0.0371, 0.0371], [0.2102, -0.2102]])  # Generator matrix
 
+Q = np.array([[-0.37,  0.37], 
+              [ 2.10, -2.10]])  # Increased magnitude
+
+mu = np.array([0.0123, -0.0157])  # Annual mean returns
+sigma = np.array([0.0347, 0.0778])  # Annual volatilities
+
+# Run single simulation
+(stats, states) = run_simulation(T, Q, mu, sigma)
+mu_est, sigma_est, gamma_est, _ = stats
+print("Single Simulation Results:")
+print("Estimated Mean Returns:", mu_est)
+print("Estimated Volatilities:", sigma_est)
+print("Estimated Jump Probability:", gamma_est)
+
+# Estimate empirical transition matrix
+P_empirical = estimate_transition_matrix(states)
+print("\nEmpirical Transition Matrix:")
+print(P_empirical)
+
+# Run parallel simulations
+# num_simulations = 10
+# summary_stats = parallel_simulation(num_simulations, T, Q, mu, sigma)
+# print("\nParallel Simulation Summary:")
+# print("Estimated Mean Returns (μ):", summary_stats["mu_mean"], "±", summary_stats["mu_std"])
+# print("Estimated Volatilities (σ):", summary_stats["sigma_mean"], "±", summary_stats["sigma_std"])
+# print("Estimated Jump Probability (γ):", summary_stats["gamma_mean"], "±", summary_stats["gamma_std"])
+
+# # Estimate empirical transition matrix for the first state sequence
+# P_empirical_parallel = estimate_transition_matrix(summary_stats["state_sequences"][0])
+# print("\nEmpirical Transition Matrix from Parallel Simulations:")
+# print(P_empirical_parallel)

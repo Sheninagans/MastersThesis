@@ -84,7 +84,7 @@ def fit(Y, num_states, lambda_penalty, grid_size,tolerance):
     C = np.array(np.meshgrid(*([C_vals] * num_states))).T.reshape(-1, num_states).T
     C = C[:, np.isclose(C.sum(axis=0), 1)]
 
-    export_to_excel(C, filename="C.csv")
+    #export_to_excel(C, filename="C.csv")
     best_S = None
     best_theta = None
     best_obj_value = float('inf')
@@ -121,11 +121,11 @@ def fit(Y, num_states, lambda_penalty, grid_size,tolerance):
             best_S = S
     
     S_df = pd.DataFrame(S_initializations)
-    export_to_excel(S_df, filename="S_initializations.csv")  # Save for analysis
+    #export_to_excel(S_df, filename="S_initializations.csv")  # Save for analysis
 
 
-    export_to_excel(best_S, filename="S_Opt.csv")
-    export_to_excel(best_theta, filename="theta_opt.csv")
+    #export_to_excel(best_S, filename="S_Opt.csv")
+    #export_to_excel(best_theta, filename="theta_opt.csv")
     #export_to_excel(np.array(obj_values), filename="obj_values.csv")
     #export_to_excel(np.array(kmeans_results), filename="kmeans_results.csv")
     
