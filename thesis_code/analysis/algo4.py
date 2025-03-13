@@ -33,7 +33,7 @@ def fit_state_sequence(Y, theta, C, lambda_penalty, num_states):
             prev_state = np.argmin(V[t-1, :] + Lambda[:, i])
             V[t, i] = L[t, i] + V[t-1, prev_state] + Lambda[prev_state, i]
     
-        S_opt = np.zeros((T, num_states))
+    S_opt = np.zeros((T, num_states))
     idx = np.argmin(V[-1, :])
     for t in range(T-1, -1, -1):
         S_opt[t] = C[:, idx]
